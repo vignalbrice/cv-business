@@ -1,0 +1,149 @@
+[
+  {
+    "id": "sba",
+    "slug": "social-boss-academy",
+    "titre": "Social Boss Academy",
+    "sousTitre": "Maîtrise les réseaux sociaux et transforme ton audience en résultats",
+    "description": "La formation complète pour structurer ton image, créer du contenu stratégique, développer ta visibilité et transformer ton audience en résultats concrets.",
+    "benefices": [
+      "Maîtriser les réseaux sociaux",
+      "Structurer ton image de marque",
+      "Créer du contenu stratégique",
+      "Développer ta visibilité organique",
+      "Transformer ton audience en résultats"
+    ],
+    "prix": 400,
+    "prixAffiche": "400€",
+    "badge": "🔥 Best-seller",
+    "couleur": "violet",
+    "stripePriceId": "price_1Su0yYEdXO2sar3q6jc7EeQD",
+    "actif": true,
+    "ordre": 1
+  },
+  {
+    "id": "sba-1to1",
+    "slug": "sba-accompagnement-sur-mesure",
+    "titre": "SBA 1:1",
+    "sousTitre": "Accompagnement stratégique personnalisé",
+    "description": "Un accompagnement sur-mesure pour ceux qui veulent aller plus vite, avec un plan clair, un cadre précis et une direction structurée.",
+    "benefices": [
+      "Un plan d'action clair et personnalisé",
+      "Un cadre stratégique précis",
+      "Une direction structurée",
+      "Une accélération ciblée de ta croissance",
+      "Un suivi individuel rapproché"
+    ],
+    "prix": 997,
+    "prixAffiche": "À partir de 997€",
+    "badge": "👑 Premium",
+    "couleur": "bleu",
+    "stripePriceId": "price_sba_1to1_placeholder",
+    "actif": true,
+    "ordre": 2
+  },
+  {
+    "id": "pack-prompts-debutants",
+    "slug": "pack-prompts-debutants",
+    "titre": "Pack Prompts Débutants",
+    "sousTitre": "Les prompts essentiels pour créer du contenu et gagner du temps",
+    "description": "Le point de départ idéal pour utiliser l'IA efficacement. Les prompts essentiels pour créer du contenu rapidement et gagner un temps précieux au quotidien.",
+    "benefices": [
+      "Créer du contenu facilement avec l'IA",
+      "Gagner du temps sur les tâches répétitives",
+      "Structurer tes idées plus rapidement",
+      "Prompts prêts à l'emploi et personnalisables",
+      "Accès immédiat après achat"
+    ],
+    "prix": 29,
+    "prixAffiche": "29€ / 49€",
+    "badge": "🔥 Idéal pour démarrer",
+    "couleur": "jaune",
+    "stripePriceId": "price_pack_prompts_debutants_placeholder",
+    "actif": true,
+    "ordre": 3
+  },
+  {
+    "id": "pack-prompts-business",
+    "slug": "pack-prompts-business",
+    "titre": "Pack Prompts Business",
+    "sousTitre": "Création de marque, storytelling, stratégie, vente, tunnel",
+    "description": "Le pack complet pour les entrepreneurs qui veulent structurer leur business avec l'IA : marque, storytelling, stratégie de contenu, vente et tunnel de conversion.",
+    "benefices": [
+      "Créer et structurer ton image de marque",
+      "Maîtriser le storytelling stratégique",
+      "Produire une stratégie de contenu solide",
+      "Rédiger tes offres et tunnels de vente",
+      "Automatiser ta communication business"
+    ],
+    "prix": 97,
+    "prixAffiche": "97€ / 149€",
+    "badge": "🔥 Business",
+    "couleur": "violet",
+    "stripePriceId": "price_pack_prompts_business_placeholder",
+    "actif": true,
+    "ordre": 4
+  },
+  {
+    "id": "pack-prompts-premium",
+    "slug": "pack-prompts-premium",
+    "titre": "Pack Prompts Premium",
+    "sousTitre": "Machine complète : contenu + vente + automatisation",
+    "description": "La machine complète. Tous les prompts pour automatiser ton contenu, optimiser ta vente et structurer une croissance durable grâce à l'IA.",
+    "benefices": [
+      "Automatiser la création de contenu",
+      "Optimiser tes tunnels de vente avec l'IA",
+      "Structurer une stratégie de croissance complète",
+      "Accéder aux prompts les plus avancés",
+      "Construire un système IA entièrement rentable"
+    ],
+    "prix": 297,
+    "prixAffiche": "297€",
+    "badge": "⚡ Premium",
+    "couleur": "vert",
+    "stripePriceId": "price_pack_prompts_premium_placeholder",
+    "actif": true,
+    "ordre": 5
+  },
+  {
+    "id": "masterclass-prompt-boss",
+    "slug": "masterclass-prompt-boss",
+    "titre": "Masterclass Prompt Boss™️",
+    "sousTitre": "La masterclass intensive pour maîtriser l'IA à un niveau stratégique",
+    "description": "La masterclass intensive Prompt Boss™️. Méthode complète, cas pratiques et accès aux stratégies avancées pour transformer l'IA en véritable levier de croissance.",
+    "benefices": [
+      "Maîtriser l'IA à un niveau stratégique avancé",
+      "Accéder à la méthode Prompt Boss™️ complète",
+      "Cas pratiques et mises en situation réelles",
+      "Construire un système IA rentable et durable",
+      "Accès à vie aux mises à jour"
+    ],
+    "prix": 397,
+    "prixAffiche": "397€ à 697€",
+    "badge": "👑 Masterclass",
+    "couleur": "rose",
+    "stripePriceId": "price_masterclass_prompt_boss_placeholder",
+    "actif": true,
+    "ordre": 6
+  },
+  {
+    "id": "coaching-prompts-personnalises",
+    "slug": "coaching-prompts-personnalises",
+    "titre": "Coaching + Prompts Personnalisés",
+    "sousTitre": "Un accompagnement sur-mesure avec des prompts créés pour toi",
+    "description": "L'expérience la plus haut de gamme. Un coaching individuel complet combiné à des prompts créés sur-mesure pour ton activité, ton positionnement et tes objectifs.",
+    "benefices": [
+      "Coaching individuel personnalisé avec Cassandra",
+      "Prompts créés spécifiquement pour ton activité",
+      "Stratégie IA sur-mesure et plan d'action clair",
+      "Suivi et ajustements en temps réel",
+      "Résultats concrets et mesurables"
+    ],
+    "prix": 997,
+    "prixAffiche": "997€ à 2500€",
+    "badge": "🏆 VIP",
+    "couleur": "bleu",
+    "stripePriceId": "price_coaching_prompts_placeholder",
+    "actif": true,
+    "ordre": 7
+  }
+]

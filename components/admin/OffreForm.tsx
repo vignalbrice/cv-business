@@ -1,8 +1,34 @@
 "use client";
 
 import { Offre } from "@/lib/offres";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Loader2, Save, X, RefreshCw, Tag, Lock, Unlock } from "lucide-react";
+
+const offreSchema = z.object({
+  titre: z.string().min(1, "Le titre est requis"),
+  slug: z
+    .string()
+    .min(1, "Le slug est requis")
+    .regex(
+      /^[a-z0-9-]+$/,
+      "Slug invalide : lettres minuscules, chiffres et tirets uniquement",
+    ),
+  sousTitre: z.string().optional(),
+  description: z.string().optional(),
+  beneficesText: z.string().optional(),
+  prix: z.string().min(1, "Le prix est requis"),
+  prixAffiche: z.string().optional(),
+  ordre: z.string().optional(),
+  badge: z.string().optional(),
+  couleur: z.enum(["violet", "bleu", "jaune", "rose", "vert"]),
+  stripePriceId: z.string().optional(),
+  actif: z.boolean(),
+});
+
+type OffreFormData = z.infer<typeof offreSchema>;
 
 interface StripePrice {
   id: string;
@@ -25,30 +51,15 @@ interface OffreFormProps {
   loading?: boolean;
 }
 
-const defaultOffre: Partial<Offre> = {
-  titre: "",
-  sousTitre: "",
-  description: "",
-  benefices: [],
-  prix: 0,
-  prixAffiche: "",
-  badge: "",
-  couleur: "violet",
-  stripePriceId: "",
-  actif: true,
-  ordre: 99,
-  slug: "",
-};
-
 function toSlug(str: string): string {
   return str
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // supprime les accents
-    .replace(/[^a-z0-9\s-]/g, "") // garde lettres, chiffres, espaces, tirets
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
     .trim()
-    .replace(/\s+/g, "-") // espaces → tirets
-    .replace(/-+/g, "-"); // tirets multiples → un seul
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
 }
 
 export default function OffreForm({
@@ -57,18 +68,43 @@ export default function OffreForm({
   onCancel,
   loading = false,
 }: OffreFormProps) {
-  const [formData, setFormData] = useState<Partial<Offre>>(
-    offre || defaultOffre,
-  );
-  const [beneficesText, setBeneficesText] = useState(
-    (offre?.benefices || []).join("\n"),
-  );
-  // En création : slug auto-généré depuis le titre
-  // En édition : slug verrouillé par défaut (déverrouillable manuellement)
   const [slugLocked, setSlugLocked] = useState(!!offre);
   const [stripeProducts, setStripeProducts] = useState<StripeProduct[]>([]);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeLoaded, setStripeLoaded] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<OffreFormData>({
+    resolver: zodResolver(offreSchema),
+    defaultValues: {
+      titre: offre?.titre ?? "",
+      slug: offre?.slug ?? "",
+      sousTitre: offre?.sousTitre ?? "",
+      description: offre?.description ?? "",
+      beneficesText: (offre?.benefices ?? []).join("\n"),
+      prix: String(offre?.prix ?? 0),
+      prixAffiche: offre?.prixAffiche ?? "",
+      ordre: String(offre?.ordre ?? 99),
+      badge: offre?.badge ?? "",
+      couleur: (offre?.couleur as OffreFormData["couleur"]) ?? "violet",
+      stripePriceId: offre?.stripePriceId ?? "",
+      actif: offre?.actif ?? true,
+    },
+  });
+
+  const titreValue = watch("titre");
+
+  // Auto-génère le slug depuis le titre si non verrouillé
+  useEffect(() => {
+    if (!slugLocked && titreValue) {
+      setValue("slug", toSlug(titreValue), { shouldValidate: true });
+    }
+  }, [titreValue, slugLocked, setValue]);
 
   const loadStripeProducts = async () => {
     setStripeLoading(true);
@@ -88,58 +124,45 @@ export default function OffreForm({
     loadStripeProducts();
   }, []);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >,
-  ) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => {
-      const updated = {
-        ...prev,
-        [name]:
-          type === "checkbox"
-            ? (e.target as HTMLInputElement).checked
-            : name === "prix" || name === "ordre"
-              ? Number(value)
-              : value,
-      };
-      // Auto-génère le slug depuis le titre si non verrouillé
-      if (name === "titre" && !slugLocked) {
-        updated.slug = toSlug(value);
-      }
-      return updated;
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const benefices = beneficesText
+  const onSubmit = (data: OffreFormData) => {
+    const benefices = (data.beneficesText ?? "")
       .split("\n")
       .map((b) => b.trim())
       .filter(Boolean);
-    onSave({ ...formData, benefices });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { beneficesText, ...rest } = data;
+    onSave({
+      ...rest,
+      prix: Number(data.prix),
+      ordre: Number(data.ordre ?? 99),
+      benefices,
+    });
   };
 
   const inputClass =
     "w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors text-sm";
+  const inputErrorClass =
+    "w-full bg-red-50 border border-red-400 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 transition-colors text-sm";
   const labelClass =
     "block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        {/* Titre */}
         <div>
           <label className={labelClass}>Titre *</label>
           <input
-            name="titre"
-            required
-            value={formData.titre || ""}
-            onChange={handleChange}
+            {...register("titre")}
             placeholder="Social Boss Academy"
-            className={inputClass}
+            className={errors.titre ? inputErrorClass : inputClass}
           />
+          {errors.titre && (
+            <p className="mt-1 text-xs text-red-600">{errors.titre.message}</p>
+          )}
         </div>
+
+        {/* Slug */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className={labelClass}>Slug *</label>
@@ -170,13 +193,10 @@ export default function OffreForm({
           </div>
           <div className="relative">
             <input
-              name="slug"
-              required
-              value={formData.slug || ""}
-              onChange={handleChange}
+              {...register("slug")}
               readOnly={slugLocked}
               placeholder="social-boss-academy"
-              className={`${inputClass} font-mono pr-10 ${
+              className={`${errors.slug ? inputErrorClass : inputClass} font-mono pr-10 ${
                 slugLocked ? "bg-gray-50 text-gray-400 cursor-not-allowed" : ""
               }`}
             />
@@ -184,10 +204,9 @@ export default function OffreForm({
               <button
                 type="button"
                 onClick={() =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    slug: toSlug(prev.titre || ""),
-                  }))
+                  setValue("slug", toSlug(watch("titre") || ""), {
+                    shouldValidate: true,
+                  })
                 }
                 title="Regénérer depuis le titre"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-purple-600 transition-colors"
@@ -196,7 +215,10 @@ export default function OffreForm({
               </button>
             )}
           </div>
-          {!slugLocked && (
+          {errors.slug && (
+            <p className="mt-1 text-xs text-red-600">{errors.slug.message}</p>
+          )}
+          {!slugLocked && !errors.slug && (
             <p className="text-xs text-gray-400 mt-1">
               Généré automatiquement depuis le titre — modifiable manuellement.
             </p>
@@ -204,58 +226,57 @@ export default function OffreForm({
         </div>
       </div>
 
+      {/* Sous-titre */}
       <div>
         <label className={labelClass}>Sous-titre</label>
         <input
-          name="sousTitre"
-          value={formData.sousTitre || ""}
-          onChange={handleChange}
+          {...register("sousTitre")}
           placeholder="Maîtrise les réseaux sociaux..."
           className={inputClass}
         />
       </div>
 
+      {/* Description */}
       <div>
         <label className={labelClass}>Description</label>
         <textarea
-          name="description"
+          {...register("description")}
           rows={3}
-          value={formData.description || ""}
-          onChange={handleChange}
           placeholder="La formation complète pour..."
           className={`${inputClass} resize-none`}
         />
       </div>
 
+      {/* Bénéfices */}
       <div>
         <label className={labelClass}>Bénéfices (1 par ligne)</label>
         <textarea
+          {...register("beneficesText")}
           rows={5}
-          value={beneficesText}
-          onChange={(e) => setBeneficesText(e.target.value)}
           placeholder={"Maîtriser les réseaux\nStructurer ton image"}
           className={`${inputClass} resize-none font-mono`}
         />
       </div>
 
+      {/* Prix */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div>
           <label className={labelClass}>Prix (€) *</label>
           <input
-            name="prix"
-            type="text"
-            required
-            value={formData.prix}
-            onChange={handleChange}
-            className={inputClass}
+            {...register("prix")}
+            type="number"
+            min={0}
+            step={0.01}
+            className={errors.prix ? inputErrorClass : inputClass}
           />
+          {errors.prix && (
+            <p className="mt-1 text-xs text-red-600">{errors.prix.message}</p>
+          )}
         </div>
         <div>
           <label className={labelClass}>Prix affiché</label>
           <input
-            name="prixAffiche"
-            value={formData.prixAffiche || ""}
-            onChange={handleChange}
+            {...register("prixAffiche")}
             placeholder="297€"
             className={inputClass}
           />
@@ -263,35 +284,27 @@ export default function OffreForm({
         <div>
           <label className={labelClass}>Ordre d&apos;affichage</label>
           <input
-            name="ordre"
+            {...register("ordre")}
             type="number"
             min={1}
-            value={formData.ordre || 1}
-            onChange={handleChange}
             className={inputClass}
           />
         </div>
       </div>
 
+      {/* Badge & Couleur */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
           <label className={labelClass}>Badge</label>
           <input
-            name="badge"
-            value={formData.badge || ""}
-            onChange={handleChange}
+            {...register("badge")}
             placeholder="🔥 Best-seller"
             className={inputClass}
           />
         </div>
         <div>
           <label className={labelClass}>Couleur</label>
-          <select
-            name="couleur"
-            value={formData.couleur || "violet"}
-            onChange={handleChange}
-            className={`${inputClass} bg-white`}
-          >
+          <select {...register("couleur")} className={`${inputClass} bg-white`}>
             <option value="violet">Violet</option>
             <option value="bleu">Bleu</option>
             <option value="jaune">Jaune</option>
@@ -301,6 +314,7 @@ export default function OffreForm({
         </div>
       </div>
 
+      {/* Stripe Price ID */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className={labelClass}>Stripe Price ID</label>
@@ -317,7 +331,6 @@ export default function OffreForm({
           </button>
         </div>
 
-        {/* Selector produits Stripe */}
         {stripeLoaded && stripeProducts.length > 0 && (
           <div className="mb-3">
             <div className="flex items-center gap-2 mb-1.5">
@@ -329,9 +342,7 @@ export default function OffreForm({
             </div>
             <select
               onChange={(e) => {
-                const val = e.target.value;
-                if (!val) return;
-                setFormData((prev) => ({ ...prev, stripePriceId: val }));
+                if (e.target.value) setValue("stripePriceId", e.target.value);
               }}
               defaultValue=""
               className={`${inputClass} bg-white`}
@@ -368,11 +379,8 @@ export default function OffreForm({
           </p>
         )}
 
-        {/* Saisie manuelle */}
         <input
-          name="stripePriceId"
-          value={formData.stripePriceId || ""}
-          onChange={handleChange}
+          {...register("stripePriceId")}
           placeholder="price_xxxxxxxxxxxxxxxx"
           className={inputClass}
         />
@@ -382,13 +390,12 @@ export default function OffreForm({
         </p>
       </div>
 
+      {/* Actif */}
       <div className="flex items-center gap-3">
         <input
+          {...register("actif")}
           type="checkbox"
           id="actif"
-          name="actif"
-          checked={formData.actif ?? true}
-          onChange={handleChange}
           className="w-4 h-4 accent-purple-500"
         />
         <label htmlFor="actif" className="text-sm text-gray-700">

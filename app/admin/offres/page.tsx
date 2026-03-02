@@ -2,6 +2,9 @@
 
 import { Offre } from "@/lib/offres";
 import { useState, useEffect, useCallback } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import OffreForm from "@/components/admin/OffreForm";
 import {
   Plus,
@@ -12,8 +15,15 @@ import {
   AlertTriangle,
   CheckCircle,
   Lock,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+
+const loginSchema = z.object({
+  token: z.string().min(1, "Le token est requis"),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function AdminOffresPage() {
   const [token, setToken] = useState(() => {
@@ -22,7 +32,6 @@ export default function AdminOffresPage() {
     }
     return "";
   });
-  const [inputToken, setInputToken] = useState("");
   const [authenticated, setAuthenticated] = useState(() => {
     if (typeof window !== "undefined") {
       return !!localStorage.getItem("admin_token");
@@ -38,6 +47,11 @@ export default function AdminOffresPage() {
     text: string;
   } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { token: "" },
+  });
 
   const showMessage = (type: "success" | "error", text: string) => {
     setMessage({ type, text });
@@ -61,18 +75,17 @@ export default function AdminOffresPage() {
     fetchOffres(token); // fetch external data, sets state in callback — valid pattern
   }, [token, authenticated, fetchOffres]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onLogin = async (data: LoginFormData) => {
     setLoading(true);
     const res = await fetch("/api/offres", {
-      headers: { "x-admin-token": inputToken },
+      headers: { "x-admin-token": data.token },
     });
     if (res.ok) {
-      localStorage.setItem("admin_token", inputToken);
-      setToken(inputToken);
+      localStorage.setItem("admin_token", data.token);
+      setToken(data.token);
       setAuthenticated(true);
-      const data = await res.json();
-      setOffres(data);
+      const offresData = await res.json();
+      setOffres(offresData);
       showMessage("success", "Connecté avec succès !");
     } else {
       showMessage("error", "Token invalide.");
@@ -181,7 +194,7 @@ export default function AdminOffresPage() {
           </div>
 
           <form
-            onSubmit={handleLogin}
+            onSubmit={loginForm.handleSubmit(onLogin)}
             className="bg-white border border-gray-200 rounded-2xl p-8 space-y-4 shadow-sm"
           >
             <div>
@@ -189,19 +202,27 @@ export default function AdminOffresPage() {
                 Token d&apos;accès
               </label>
               <input
+                {...loginForm.register("token")}
                 type="password"
-                value={inputToken}
-                onChange={(e) => setInputToken(e.target.value)}
                 placeholder="••••••••••••"
-                required
-                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-purple-500 transition-colors text-sm"
+                className={`w-full bg-white border rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-purple-500 transition-colors text-sm ${
+                  loginForm.formState.errors.token
+                    ? "border-red-400 bg-red-50"
+                    : "border-gray-300"
+                }`}
               />
+              {loginForm.formState.errors.token && (
+                <p className="mt-1 text-xs text-red-600">
+                  {loginForm.formState.errors.token.message}
+                </p>
+              )}
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-linear-to-r from-purple-600 to-purple-800 text-white font-bold rounded-xl hover:from-purple-700 hover:to-purple-900 transition-all"
+              className="w-full py-3 bg-linear-to-r from-purple-600 to-purple-800 text-white font-bold rounded-xl hover:from-purple-700 hover:to-purple-900 transition-all flex items-center justify-center gap-2"
             >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               Se connecter
             </button>
           </form>

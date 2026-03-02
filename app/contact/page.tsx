@@ -1,34 +1,69 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Phone, Mail, Send, Loader2 } from "lucide-react";
 
+const contactSchema = z.object({
+  nom: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  email: z.string().email("Adresse email invalide"),
+  telephone: z
+    .string()
+    .regex(/^(\+33|0)[1-9](\s?\d{2}){4}$/, "Numéro de téléphone invalide")
+    .or(z.literal(""))
+    .optional(),
+  projet: z.enum(["sba", "sba-1to1", "prompt-boss", "empire", "autre"], {
+    message: "Sélectionne une option",
+  }),
+  message: z
+    .string()
+    .min(20, "Le message doit contenir au moins 20 caractères"),
+});
+
+type ContactFormData = z.infer<typeof contactSchema>;
+
+const inputClass =
+  "w-full bg-white border rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none transition-colors text-sm";
+const inputValid = "border-gray-300 focus:border-purple-500";
+const inputError = "border-red-400 focus:border-red-500 bg-red-50";
+
 export default function ContactPage() {
-  const [formData, setFormData] = useState({
-    nom: "",
-    email: "",
-    telephone: "",
-    projet: "",
-    message: "",
-  });
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >,
-  ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ContactFormData>({
+    resolver: zodResolver(contactSchema),
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const onSubmit = async (data: ContactFormData) => {
     setStatus("loading");
-    // Simulation envoi (à remplacer par une vraie API email)
-    await new Promise((r) => setTimeout(r, 1500));
-    setStatus("success");
+    setErrorMessage(null);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? "Erreur inconnue");
+      }
+      setStatus("success");
+    } catch (e) {
+      setErrorMessage(
+        e instanceof Error ? e.message : "Une erreur est survenue. Réessaie.",
+      );
+      setStatus("error");
+    }
   };
 
   return (
@@ -130,64 +165,82 @@ export default function ContactPage() {
               </div>
             ) : (
               <form
-                onSubmit={handleSubmit}
+                onSubmit={handleSubmit(onSubmit)}
                 className="bg-gray-50 border border-gray-200 rounded-2xl p-8 space-y-6"
               >
+                {status === "error" && errorMessage && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+                    <span className="shrink-0">⚠️</span>
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* Nom */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Nom complet *
                     </label>
                     <input
+                      {...register("nom")}
                       type="text"
-                      name="nom"
-                      required
-                      value={formData.nom}
-                      onChange={handleChange}
                       placeholder="Ton prénom et nom"
-                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors text-sm"
+                      className={`${inputClass} ${errors.nom ? inputError : inputValid}`}
                     />
+                    {errors.nom && (
+                      <p className="mt-1.5 text-xs text-red-600">
+                        {errors.nom.message}
+                      </p>
+                    )}
                   </div>
+
+                  {/* Email */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Email *
                     </label>
                     <input
+                      {...register("email")}
                       type="email"
-                      name="email"
-                      required
-                      value={formData.email}
-                      onChange={handleChange}
                       placeholder="ton@email.com"
-                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors text-sm"
+                      className={`${inputClass} ${errors.email ? inputError : inputValid}`}
                     />
+                    {errors.email && (
+                      <p className="mt-1.5 text-xs text-red-600">
+                        {errors.email.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
+                {/* Téléphone */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Téléphone
+                    Téléphone{" "}
+                    <span className="text-gray-400 font-normal">
+                      (optionnel)
+                    </span>
                   </label>
                   <input
+                    {...register("telephone")}
                     type="tel"
-                    name="telephone"
-                    value={formData.telephone}
-                    onChange={handleChange}
                     placeholder="06 00 00 00 00"
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors text-sm"
+                    className={`${inputClass} ${errors.telephone ? inputError : inputValid}`}
                   />
+                  {errors.telephone && (
+                    <p className="mt-1.5 text-xs text-red-600">
+                      {errors.telephone.message}
+                    </p>
+                  )}
                 </div>
 
+                {/* Projet */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Ton projet / besoin *
                   </label>
                   <select
-                    name="projet"
-                    required
-                    value={formData.projet}
-                    onChange={handleChange}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-purple-500 transition-colors text-sm"
+                    {...register("projet")}
+                    className={`${inputClass} bg-white ${errors.projet ? inputError : inputValid}`}
                   >
                     <option value="">Sélectionne une option</option>
                     <option value="sba">Social Boss Academy</option>
@@ -198,21 +251,29 @@ export default function ContactPage() {
                     <option value="empire">Empire financier</option>
                     <option value="autre">Autre</option>
                   </select>
+                  {errors.projet && (
+                    <p className="mt-1.5 text-xs text-red-600">
+                      {errors.projet.message}
+                    </p>
+                  )}
                 </div>
 
+                {/* Message */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Décris ta situation et tes objectifs *
                   </label>
                   <textarea
-                    name="message"
-                    required
+                    {...register("message")}
                     rows={5}
-                    value={formData.message}
-                    onChange={handleChange}
                     placeholder="Parle-moi de toi, de ton business actuel, de tes blocages et de ce que tu veux accomplir..."
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors text-sm resize-none"
+                    className={`${inputClass} resize-none ${errors.message ? inputError : inputValid}`}
                   />
+                  {errors.message && (
+                    <p className="mt-1.5 text-xs text-red-600">
+                      {errors.message.message}
+                    </p>
+                  )}
                 </div>
 
                 <button

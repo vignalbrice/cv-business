@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   ExternalLink,
   RefreshCw,
@@ -38,36 +41,26 @@ interface StripeProduct {
   metadata: Record<string, string>;
 }
 
-interface CreateForm {
-  name: string;
-  description: string;
-  imageUrl: string;
-  prix: string;
-  currency: string;
-  type: "one_time" | "recurring";
-  interval: "month" | "year";
-  installments: number[]; // options de paiement en plusieurs fois
-}
+// ── Schémas Zod ──────────────────────────────────────────────────────────────
+const createSchema = z.object({
+  name: z.string().min(1, "Le nom est requis"),
+  description: z.string().optional(),
+  imageUrl: z.string().optional(),
+  prix: z.string().min(1, "Le prix est requis"),
+  currency: z.enum(["eur", "usd", "gbp"]),
+  type: z.enum(["one_time", "recurring"]),
+  interval: z.enum(["month", "year"]),
+});
+type CreateFormData = z.infer<typeof createSchema>;
 
-interface EditForm {
-  name: string;
-  description: string;
-  imageUrl: string;
-  installments: number[];
-}
+const editSchema = z.object({
+  name: z.string().min(1, "Le nom est requis"),
+  description: z.string().optional(),
+  imageUrl: z.string().optional(),
+});
+type EditFormData = z.infer<typeof editSchema>;
 
 const INSTALLMENT_OPTIONS = [2, 3, 4, 6, 10, 12];
-
-const defaultForm: CreateForm = {
-  name: "",
-  description: "",
-  imageUrl: "",
-  prix: "",
-  currency: "eur",
-  type: "one_time",
-  interval: "month",
-  installments: [],
-};
 
 export default function StripeProductsPage() {
   const [products, setProducts] = useState<StripeProduct[]>([]);
@@ -77,7 +70,7 @@ export default function StripeProductsPage() {
 
   // Formulaire création
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<CreateForm>(defaultForm);
+  const [createInstallments, setCreateInstallments] = useState<number[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -86,15 +79,34 @@ export default function StripeProductsPage() {
   const [editingProduct, setEditingProduct] = useState<StripeProduct | null>(
     null,
   );
-  const [editForm, setEditForm] = useState<EditForm>({
-    name: "",
-    description: "",
-    imageUrl: "",
-    installments: [],
-  });
+  const [editInstallments, setEditInstallments] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
+
+  // RHF — formulaire création
+  const createForm = useForm<CreateFormData>({
+    resolver: zodResolver(createSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      imageUrl: "",
+      prix: "",
+      currency: "eur",
+      type: "one_time",
+      interval: "month",
+    },
+  });
+
+  // RHF — formulaire modification
+  const editForm = useForm<EditFormData>({
+    resolver: zodResolver(editSchema),
+    defaultValues: { name: "", description: "", imageUrl: "" },
+  });
+
+  const watchCreateType = createForm.watch("type");
+  const watchCreatePrix = createForm.watch("prix");
+  const watchCreateCurrency = createForm.watch("currency");
 
   const getAdminToken = () =>
     typeof window !== "undefined"
@@ -142,8 +154,7 @@ export default function StripeProductsPage() {
     return price.id;
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onCreateSubmit = async (data: CreateFormData) => {
     setCreating(true);
     setCreateError(null);
     setCreateSuccess(null);
@@ -155,23 +166,24 @@ export default function StripeProductsPage() {
           "x-admin-token": getAdminToken(),
         },
         body: JSON.stringify({
-          name: form.name,
-          description: form.description || undefined,
-          imageUrl: form.imageUrl || undefined,
-          prix: parseFloat(form.prix),
-          currency: form.currency,
-          type: form.type,
-          interval: form.interval,
+          name: data.name,
+          description: data.description || undefined,
+          imageUrl: data.imageUrl || undefined,
+          prix: parseFloat(data.prix),
+          currency: data.currency,
+          type: data.type,
+          interval: data.interval,
           installments:
-            form.installments.length > 0 ? form.installments : undefined,
+            createInstallments.length > 0 ? createInstallments : undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erreur inconnue");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erreur inconnue");
       setCreateSuccess(
-        `✅ Produit "${data.product.name}" créé — Price ID : ${data.price.id}`,
+        `✅ Produit "${json.product.name}" créé — Price ID : ${json.price.id}`,
       );
-      setForm(defaultForm);
+      createForm.reset();
+      setCreateInstallments([]);
       setShowForm(false);
       await fetchProducts();
     } catch (e) {
@@ -183,21 +195,22 @@ export default function StripeProductsPage() {
 
   const openEdit = (product: StripeProduct) => {
     setEditingProduct(product);
-    setEditForm({
+    editForm.reset({
       name: product.name,
       description: product.description ?? "",
       imageUrl: product.images[0] ?? "",
-      installments: Object.keys(product.metadata ?? {})
+    });
+    setEditInstallments(
+      Object.keys(product.metadata ?? {})
         .filter((k) => k.startsWith("installments_"))
         .map((k) => parseInt(k.replace("installments_", "").replace("x", "")))
         .sort((a, b) => a - b),
-    });
+    );
     setEditError(null);
     setEditSuccess(null);
   };
 
-  const handleEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onEditSubmit = async (data: EditFormData) => {
     if (!editingProduct) return;
     setSaving(true);
     setEditError(null);
@@ -211,14 +224,14 @@ export default function StripeProductsPage() {
         },
         body: JSON.stringify({
           productId: editingProduct.id,
-          name: editForm.name,
-          description: editForm.description,
-          imageUrl: editForm.imageUrl,
-          installments: editForm.installments,
+          name: data.name,
+          description: data.description,
+          imageUrl: data.imageUrl,
+          installments: editInstallments,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erreur inconnue");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erreur inconnue");
       setEditSuccess("✅ Produit mis à jour !");
       setEditingProduct(null);
       await fetchProducts();
@@ -315,41 +328,47 @@ export default function StripeProductsPage() {
                 ⚠️ {createError}
               </div>
             )}
-            <form onSubmit={handleCreate} className="space-y-5">
+            <form
+              onSubmit={createForm.handleSubmit(onCreateSubmit)}
+              className="space-y-5"
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className={labelClass}>Nom du produit *</label>
                   <input
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    {...createForm.register("name")}
                     placeholder="Social Boss Academy"
-                    className={inputClass}
+                    className={`${inputClass} ${createForm.formState.errors.name ? "border-red-400 bg-red-50" : ""}`}
                   />
+                  {createForm.formState.errors.name && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {createForm.formState.errors.name.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={labelClass}>Prix (€) *</label>
                   <input
-                    required
+                    {...createForm.register("prix")}
                     type="number"
                     min="0.50"
                     step="0.01"
-                    value={form.prix}
-                    onChange={(e) => setForm({ ...form, prix: e.target.value })}
                     placeholder="97"
-                    className={inputClass}
+                    className={`${inputClass} ${createForm.formState.errors.prix ? "border-red-400 bg-red-50" : ""}`}
                   />
+                  {createForm.formState.errors.prix && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {createForm.formState.errors.prix.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div>
                 <label className={labelClass}>Description</label>
                 <textarea
+                  {...createForm.register("description")}
                   rows={2}
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
                   placeholder="Description affichée sur Stripe..."
                   className={`${inputClass} resize-none`}
                 />
@@ -362,8 +381,8 @@ export default function StripeProductsPage() {
                   Image (optionnel)
                 </label>
                 <ImageUploader
-                  value={form.imageUrl}
-                  onChange={(url) => setForm({ ...form, imageUrl: url })}
+                  value={createForm.watch("imageUrl") ?? ""}
+                  onChange={(url) => createForm.setValue("imageUrl", url)}
                   adminToken={getAdminToken()}
                 />
               </div>
@@ -372,10 +391,7 @@ export default function StripeProductsPage() {
                 <div>
                   <label className={labelClass}>Devise</label>
                   <select
-                    value={form.currency}
-                    onChange={(e) =>
-                      setForm({ ...form, currency: e.target.value })
-                    }
+                    {...createForm.register("currency")}
                     className={`${inputClass} bg-white`}
                   >
                     <option value="eur">EUR — €</option>
@@ -386,30 +402,18 @@ export default function StripeProductsPage() {
                 <div>
                   <label className={labelClass}>Type de paiement</label>
                   <select
-                    value={form.type}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        type: e.target.value as "one_time" | "recurring",
-                      })
-                    }
+                    {...createForm.register("type")}
                     className={`${inputClass} bg-white`}
                   >
                     <option value="one_time">Paiement unique</option>
                     <option value="recurring">Abonnement</option>
                   </select>
                 </div>
-                {form.type === "recurring" && (
+                {watchCreateType === "recurring" && (
                   <div>
                     <label className={labelClass}>Fréquence</label>
                     <select
-                      value={form.interval}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          interval: e.target.value as "month" | "year",
-                        })
-                      }
+                      {...createForm.register("interval")}
                       className={`${inputClass} bg-white`}
                     >
                       <option value="month">Mensuel</option>
@@ -420,7 +424,7 @@ export default function StripeProductsPage() {
               </div>
 
               {/* Options de paiement en plusieurs fois (one_time uniquement) */}
-              {form.type === "one_time" && (
+              {watchCreateType === "one_time" && (
                 <div>
                   <label className={labelClass}>
                     Paiement en plusieurs fois (optionnel)
@@ -431,21 +435,22 @@ export default function StripeProductsPage() {
                   </p>
                   <div className="flex flex-wrap gap-3">
                     {INSTALLMENT_OPTIONS.map((n) => {
-                      const selected = form.installments.includes(n);
-                      const perInstallment = form.prix
-                        ? `${(parseFloat(form.prix) / n).toFixed(2)} ${form.currency.toUpperCase()}`
+                      const selected = createInstallments.includes(n);
+                      const perInstallment = watchCreatePrix
+                        ? `${(parseFloat(watchCreatePrix) / n).toFixed(2)} ${(watchCreateCurrency ?? "eur").toUpperCase()}`
                         : null;
                       return (
                         <button
                           key={n}
                           type="button"
                           onClick={() =>
-                            setForm({
-                              ...form,
-                              installments: selected
-                                ? form.installments.filter((x) => x !== n)
-                                : [...form.installments, n],
-                            })
+                            setCreateInstallments(
+                              selected
+                                ? createInstallments.filter(
+                                    (x: number) => x !== n,
+                                  )
+                                : [...createInstallments, n],
+                            )
                           }
                           className={`flex flex-col items-center px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                             selected
@@ -465,11 +470,13 @@ export default function StripeProductsPage() {
                       );
                     })}
                   </div>
-                  {form.installments.length > 0 && (
+                  {createInstallments.length > 0 && (
                     <p className="text-xs text-purple-600 mt-2 font-medium">
                       ✓{" "}
-                      {[...form.installments].sort((a, b) => a - b).join("×, ")}
-                      × sélectionné{form.installments.length > 1 ? "s" : ""}
+                      {[...createInstallments]
+                        .sort((a, b) => a - b)
+                        .join("×, ")}
+                      × sélectionné{createInstallments.length > 1 ? "s" : ""}
                     </p>
                   )}
                 </div>
@@ -492,7 +499,8 @@ export default function StripeProductsPage() {
                   type="button"
                   onClick={() => {
                     setShowForm(false);
-                    setForm(defaultForm);
+                    createForm.reset();
+                    setCreateInstallments([]);
                     setCreateError(null);
                   }}
                   className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2"
@@ -522,27 +530,28 @@ export default function StripeProductsPage() {
               </div>
             )}
 
-            <form onSubmit={handleEdit} className="space-y-5">
+            <form
+              onSubmit={editForm.handleSubmit(onEditSubmit)}
+              className="space-y-5"
+            >
               <div>
                 <label className={labelClass}>Nom du produit *</label>
                 <input
-                  required
-                  value={editForm.name}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, name: e.target.value })
-                  }
-                  className={inputClass}
+                  {...editForm.register("name")}
+                  className={`${inputClass} ${editForm.formState.errors.name ? "border-red-400 bg-red-50" : ""}`}
                 />
+                {editForm.formState.errors.name && (
+                  <p className="mt-1 text-xs text-red-600">
+                    {editForm.formState.errors.name.message}
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className={labelClass}>Description</label>
                 <textarea
+                  {...editForm.register("description")}
                   rows={2}
-                  value={editForm.description}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, description: e.target.value })
-                  }
                   placeholder="Description affichée sur Stripe..."
                   className={`${inputClass} resize-none`}
                 />
@@ -555,10 +564,8 @@ export default function StripeProductsPage() {
                   Image
                 </label>
                 <ImageUploader
-                  value={editForm.imageUrl}
-                  onChange={(url) =>
-                    setEditForm({ ...editForm, imageUrl: url })
-                  }
+                  value={editForm.watch("imageUrl") ?? ""}
+                  onChange={(url) => editForm.setValue("imageUrl", url)}
                   adminToken={getAdminToken()}
                 />
               </div>
@@ -572,7 +579,7 @@ export default function StripeProductsPage() {
                 </p>
                 <div className="flex flex-wrap gap-3">
                   {INSTALLMENT_OPTIONS.map((n) => {
-                    const selected = editForm.installments.includes(n);
+                    const selected = editInstallments.includes(n);
                     const basePrice =
                       typeof editingProduct?.default_price === "object"
                         ? ((
@@ -597,12 +604,11 @@ export default function StripeProductsPage() {
                         key={n}
                         type="button"
                         onClick={() =>
-                          setEditForm({
-                            ...editForm,
-                            installments: selected
-                              ? editForm.installments.filter((x) => x !== n)
-                              : [...editForm.installments, n],
-                          })
+                          setEditInstallments(
+                            selected
+                              ? editInstallments.filter((x: number) => x !== n)
+                              : [...editInstallments, n],
+                          )
                         }
                         className={`flex flex-col items-center px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                           selected
@@ -622,13 +628,10 @@ export default function StripeProductsPage() {
                     );
                   })}
                 </div>
-                {editForm.installments.length > 0 && (
+                {editInstallments.length > 0 && (
                   <p className="text-xs text-amber-600 mt-2 font-medium">
-                    ✓{" "}
-                    {[...editForm.installments]
-                      .sort((a, b) => a - b)
-                      .join("×, ")}
-                    × activé{editForm.installments.length > 1 ? "s" : ""}
+                    ✓ {[...editInstallments].sort((a, b) => a - b).join("×, ")}×
+                    activé{editInstallments.length > 1 ? "s" : ""}
                   </p>
                 )}
               </div>

@@ -11,7 +11,14 @@ const contactSchema = z.object({
   nom: z.string().min(2),
   email: z.string().email(),
   telephone: z.string().optional(),
-  projet: z.enum(["sba", "sba-1to1", "prompt-boss", "empire", "autre"]),
+  projet: z.enum([
+    "sba",
+    "sba-1to1",
+    "prompt-boss",
+    "empire",
+    "site-vitrine-bf",
+    "autre",
+  ]),
   message: z.string().min(20),
 });
 
@@ -20,6 +27,7 @@ const PROJET_LABELS: Record<string, string> = {
   "sba-1to1": "SBA 1:1 — Accompagnement sur mesure",
   "prompt-boss": "Prompt Boss",
   empire: "Empire financier",
+  "site-vitrine-bf": "Black Friday — Site vitrine clé en main 48h (550 €)",
   autre: "Autre",
 };
 
